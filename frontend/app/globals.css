@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Custom Keyframe Animations ───────────────────────────────────────── */
+@keyframes rotate-slow {
+  from { transform: rotate(0deg) scale(1.1); }
+  to   { transform: rotate(360deg) scale(1.1); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.4;
+    filter: blur(40px);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.7;
+    filter: blur(60px);
+  }
+}
+
+@keyframes wave {
+  0%, 100% { height: 4px; }
+  50%       { height: 16px; }
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── Animation Utility Classes ─────────────────────────────────────────── */
+.rotate-slow {
+  animation: rotate-slow 60s linear infinite;
+}
+
+.pulse-sync {
+  animation: pulse-glow 10s ease-in-out infinite;
+}
+
+.wave-bar {
+  width: 2px;
+  background-color: #00f5ff;
+  border-radius: 1px;
+  animation: wave 1s ease-in-out infinite;
+}
+
+/* ── Globe / Glow Helpers ──────────────────────────────────────────────── */
+.glow-orb {
+  background: radial-gradient(
+    circle,
+    rgba(19, 91, 236, 0.6)   0%,
+    rgba(139, 92, 246, 0.3) 40%,
+    rgba(0, 245, 255, 0.1)  60%,
+    rgba(10, 15, 24, 0)     80%
+  );
+}
+
+.mask-image-radial {
+  mask-image: radial-gradient(circle, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle, black 40%, transparent 80%);
+}
+
+.glass-card {
+  background: rgba(25, 34, 51, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(50, 68, 103, 0.3);
+}
+
+/* ── Base Styles ───────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-[#0a0f18] text-slate-100 antialiased overflow-x-hidden;
+  }
+
+  ::selection {
+    @apply bg-blue-600/30;
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0a0f18;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-700;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
