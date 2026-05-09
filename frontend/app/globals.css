@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Brand CSS Variables ───────────────────────────────────────────── */
+:root {
+  /* Brand palette */
+  --primary:        #1a365d;   /* deep navy */
+  --primary-light:  #2563eb;   /* royal blue */
+  --accent:         #3182ce;   /* medium blue */
+  --success:        #38a169;   /* emerald */
+  --warning:        #d69e2e;   /* amber */
+  --danger:         #e53e3e;   /* red */
+
+  /* Surface */
+  --surface:        #ffffff;
+  --canvas:         #f8fafc;
+  --border:         #e2e8f0;
+
+  /* Typography */
+  --font-sans:      var(--font-inter, "Inter", system-ui, sans-serif);
+  --font-display:   var(--font-jakarta, "Plus Jakarta Sans", system-ui, sans-serif);
+
+  /* Radius */
+  --radius-sm:   8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+}
+
 /* ── Custom Keyframe Animations ───────────────────────────────────────── */
 @keyframes rotate-slow {
   from { transform: rotate(0deg) scale(1.1); }
@@ -96,8 +127,34 @@
   }
 }
 
+/* ── SSE Streaming Cursor ──────────────────────────────────────────── */
+.streaming-cursor::after {
+  content: '█';
+  animation: blink-cursor 0.9s step-end infinite;
+  margin-left: 1px;
+  color: #2563eb;
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+/* ── Smooth Transitions ──────────────────────────────────────────── */
+* {
+  transition-property: background-color, border-color, color, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Override: don't animate layout-affecting properties globally */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
   }
 }

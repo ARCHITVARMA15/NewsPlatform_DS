@@ -3,13 +3,16 @@ State definition for the RAG Agent.
 
 RAGAgentState is passed between every node in the RAG graph.
 """
-from __future__ import annotations
-
 from typing import Annotated
 
 from typing_extensions import TypedDict
 
 from langgraph.graph.message import add_messages
+
+
+def _last_wins(old: str, new: str) -> str:  # noqa: ARG001
+    """Reducer: last writer wins — allows parallel nodes to update current_step."""
+    return new
 
 
 class RAGAgentState(TypedDict):
@@ -47,7 +50,9 @@ class RAGAgentState(TypedDict):
     # ------------------------------------------------------------------ #
     # Control                                                             #
     # ------------------------------------------------------------------ #
-    current_step: str
+    # last-writer-wins so parallel nodes (vector_retriever + web_search_rag)
+    # can both update current_step in the same super-step.
+    current_step: Annotated[str, _last_wins]
     error: str | None
     human_action: str | None
     clarify_mode: str          # "hybrid" | "pdf_only" | "web_only"

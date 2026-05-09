@@ -265,7 +265,7 @@ function RightPanel({
           <div className="flex justify-between">
             <span className="text-[11px] text-slate-400">Thread ID:</span>
             <span className="text-[11px] font-mono text-slate-300 truncate max-w-[100px]">
-              {threadId.slice(0, 8)}…
+              {threadId ? `${threadId.slice(0, 8)}…` : "——"}
             </span>
           </div>
           <div className="h-px bg-slate-700 my-1" />
@@ -575,7 +575,7 @@ export function AgentChat({
           {/* Thread ref badge */}
           {hasMessages && (
             <span className="text-[11px] font-mono text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-              #{threadId.slice(0, 8)}
+              #{threadId ? threadId.slice(0, 8) : "……"}
             </span>
           )}
           {/* Generate Report shortcut */}

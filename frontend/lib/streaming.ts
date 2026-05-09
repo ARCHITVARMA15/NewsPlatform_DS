@@ -9,7 +9,7 @@
  */
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { Citation, StreamMessage } from "./types";
 
@@ -47,7 +47,7 @@ const _initialState = (): AgentStreamState => ({
   currentStep: null,
   isInterrupted: false,
   availableActions: [],
-  threadId: uuidv4(),
+  threadId: "",   // assigned client-side in useEffect to avoid SSR hydration mismatch
   error: null,
   answer: null,
   citations: [],
@@ -66,6 +66,11 @@ const _initialState = (): AgentStreamState => ({
 export function useAgentStream(agentType: "agent" | "rag") {
   const [state, setState] = useState<AgentStreamState>(_initialState);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Generate a stable client-side thread ID after mount (avoids SSR/client UUID mismatch)
+  useEffect(() => {
+    setState((s) => (s.threadId ? s : { ...s, threadId: uuidv4() }));
+  }, []);
 
   // ── SSE parser ────────────────────────────────────────────────────────── //
   const _consumeStream = useCallback(async (response: Response) => {
