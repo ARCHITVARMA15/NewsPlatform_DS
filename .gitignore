@@ -1,0 +1,51 @@
+# ── Environment variables (NEVER commit these) ──────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── LangGraph / SQLite checkpoints ───────────────────────────────────────────
+*.db
+checkpoints.db
+backend/checkpoints.db
+
+# ── Generated PDFs ───────────────────────────────────────────────────────────
+/tmp/*.pdf
+*.pdf
+
+# ── Node.js / Next.js ────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+frontend/.next/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS files ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
