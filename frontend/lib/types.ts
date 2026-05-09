@@ -93,7 +93,9 @@ export interface StreamMessage {
     | "error"
     | "interrupted"
     | "pdf_ready"
-    | "pdf_ingested";
+    | "pdf_ingested"
+    | "bias_result"
+    | "trend_result";
   content?: string;
   step?: string;
   answer?: string;
@@ -207,6 +209,15 @@ export interface ValidatedSource {
   title?: string;
   url?: string;
   credibility?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard filter state
+// ---------------------------------------------------------------------------
+export interface ArticleFilters {
+  search: string;
+  category: string;
+  sentiment: string;
 }
 
 // ---------------------------------------------------------------------------

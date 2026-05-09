@@ -31,6 +31,14 @@ interface AgentStreamState {
   error: string | null;
   answer: string | null;
   citations: Citation[];
+  // News agent result fields
+  summary: string | null;
+  insights: string[];
+  sentiment: string | null;
+  sentimentScore: number | null;
+  confidenceScores: Record<string, number>;
+  biasAnalysis: Record<string, unknown> | null;
+  trendData: unknown[];
 }
 
 const _initialState = (): AgentStreamState => ({
@@ -43,6 +51,13 @@ const _initialState = (): AgentStreamState => ({
   error: null,
   answer: null,
   citations: [],
+  summary: null,
+  insights: [],
+  sentiment: null,
+  sentimentScore: null,
+  confidenceScores: {},
+  biasAnalysis: null,
+  trendData: [],
 });
 
 // ---------------------------------------------------------------------------
@@ -101,14 +116,24 @@ export function useAgentStream(agentType: "agent" | "rag") {
                   type: "answer",
                   answer: (data.answer as string) ?? "",
                   citations: (data.citations as Citation[]) ?? [],
+                  // News Intelligence Agent fields
+                  summary: data.summary as string | undefined,
+                  insights: data.insights as string[] | undefined,
+                  sentiment: data.sentiment as string | undefined,
+                  sentiment_score: data.sentiment_score as number | undefined,
+                  confidence_scores: data.confidence_scores as Record<string, number> | undefined,
                   timestamp: new Date().toISOString(),
                 };
                 return {
                   ...prev,
                   messages: [...prev.messages, newMsg],
                   answer: (data.answer as string) ?? prev.answer,
-                  citations:
-                    (data.citations as Citation[]) ?? prev.citations,
+                  citations: (data.citations as Citation[]) ?? prev.citations,
+                  summary: (data.summary as string) ?? prev.summary,
+                  insights: (data.insights as string[]) ?? prev.insights,
+                  sentiment: (data.sentiment as string) ?? prev.sentiment,
+                  sentimentScore: (data.sentiment_score as number) ?? prev.sentimentScore,
+                  confidenceScores: (data.confidence_scores as Record<string, number>) ?? prev.confidenceScores,
                 };
               }
 
@@ -159,6 +184,36 @@ export function useAgentStream(agentType: "agent" | "rag") {
                     } as StreamMessage,
                   ],
                 };
+
+              case "bias_result": {
+                return {
+                  ...prev,
+                  biasAnalysis: data.bias_analysis as Record<string, unknown>,
+                  messages: [
+                    ...prev.messages,
+                    {
+                      type: "bias_result",
+                      bias_analysis: data.bias_analysis,
+                      timestamp: new Date().toISOString(),
+                    } as StreamMessage,
+                  ],
+                };
+              }
+
+              case "trend_result": {
+                return {
+                  ...prev,
+                  trendData: (data.trend_data as unknown[]) ?? [],
+                  messages: [
+                    ...prev.messages,
+                    {
+                      type: "trend_result",
+                      trend_data: data.trend_data,
+                      timestamp: new Date().toISOString(),
+                    } as StreamMessage,
+                  ],
+                };
+              }
 
               case "error":
                 return {
@@ -364,6 +419,14 @@ export function useAgentStream(agentType: "agent" | "rag") {
     error:            state.error,
     answer:           state.answer,
     citations:        state.citations,
+    // News agent state
+    summary:          state.summary,
+    insights:         state.insights,
+    sentiment:        state.sentiment,
+    sentimentScore:   state.sentimentScore,
+    confidenceScores: state.confidenceScores,
+    biasAnalysis:     state.biasAnalysis,
+    trendData:        state.trendData,
     // Methods
     startStream,
     sendAction,
