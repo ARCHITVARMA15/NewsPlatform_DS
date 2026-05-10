@@ -322,6 +322,10 @@ export function useAgentStream(agentType: "agent" | "rag") {
         isInterrupted: false,
         error: null,
         currentStep: null,
+        // Remove stale interrupted messages — they'll be re-added fresh when
+        // the graph pauses again. Without this, each action appends a new
+        // interrupted message producing duplicate button rows.
+        messages: prev.messages.filter((m) => m.type !== "interrupted"),
       }));
 
       try {

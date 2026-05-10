@@ -24,6 +24,7 @@ from app.routers.pipeline_router import router as pipeline_router
 from app.routers.agent_router import router as agent_router
 from app.routers.rag_router import router as rag_router
 from app.routers.dashboard_router import router as dashboard_router
+from app.routers.broadcast_router import router as broadcast_router
 from app.database.supabase_client import init_supabase_tables
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 
@@ -70,6 +71,7 @@ app.include_router(pipeline_router)
 app.include_router(agent_router)
 app.include_router(rag_router)
 app.include_router(dashboard_router)
+app.include_router(broadcast_router)
 
 
 # ---------------------------------------------------------------------------

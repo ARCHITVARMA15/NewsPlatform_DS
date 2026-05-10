@@ -513,7 +513,12 @@ export function AgentChat({
           </motion.div>
         );
 
-      case "interrupted":
+      case "interrupted": {
+        // Only render buttons for the LAST interrupted message in the array.
+        // Earlier ones are historical checkpoints — clicking them would re-send
+        // a stale action and produce duplicate result cards.
+        const lastInterruptedIdx = messages.map((m) => m.type).lastIndexOf("interrupted");
+        if (i !== lastInterruptedIdx) return null;
         return (
           <motion.div
             key={i}
@@ -523,6 +528,7 @@ export function AgentChat({
             <HumanInLoopButtons onAction={onAction} isLoading={isStreaming} />
           </motion.div>
         );
+      }
 
       case "error":
         return (
@@ -632,11 +638,6 @@ export function AgentChat({
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Interruption actions (shown inline at bottom when interrupted) */}
-            {isInterrupted && messages[messages.length - 1]?.type !== "interrupted" && (
-              <HumanInLoopButtons onAction={onAction} isLoading={isStreaming} />
-            )}
 
             {/* Global error banner */}
             {error && (

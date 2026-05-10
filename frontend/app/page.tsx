@@ -10,6 +10,7 @@ import {
   Shield,
   Sparkles,
   TrendingUp,
+  Tv,
   Zap,
 } from "lucide-react";
 
@@ -28,7 +29,9 @@ export default function HomePage() {
 
         <nav className="hidden md:flex items-center gap-10">
           <Link href="/dashboard" className="text-slate-300 text-sm font-medium hover:text-blue-400 transition-colors">Dashboard</Link>
-          <Link href="/news"      className="text-slate-300 text-sm font-medium hover:text-blue-400 transition-colors">News Feed</Link>
+          <Link href="/broadcast" className="text-slate-300 text-sm font-medium hover:text-violet-400 transition-colors flex items-center gap-1.5">
+            <Tv className="size-3.5" />Broadcast Analyzer
+          </Link>
           <Link href="/agent"     className="text-slate-300 text-sm font-medium hover:text-blue-400 transition-colors">News Agent</Link>
           <Link href="/rag"       className="text-slate-300 text-sm font-medium hover:text-blue-400 transition-colors">RAG Agent</Link>
         </nav>

@@ -10,6 +10,7 @@ import {
   Globe2,
   LayoutDashboard,
   Settings,
+  Tv,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,12 @@ const NAV_ITEMS = [
     icon:  FileSearch,
     label: "RAG Chatbot",
     desc:  "PDF + Web Research",
+  },
+  {
+    href:  "/broadcast",
+    icon:  Tv,
+    label: "Broadcast Analyzer",
+    desc:  "YouTube & Video",
   },
   {
     href:  "#",

@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     sqlite_db_path: str = "./checkpoints.db"
     frontend_url: str = "http://localhost:3000"
 
+    # Whisper (broadcast analyzer)
+    whisper_model: str = "base"   # env var: WHISPER_MODEL
+
 
 settings = Settings()
 
