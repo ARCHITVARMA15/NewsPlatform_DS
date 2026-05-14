@@ -14,6 +14,7 @@ import {
   Settings,
   Swords,
   Tv,
+  Users,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,12 @@ const NAV_ITEMS = [
     icon:  GitFork,
     label: "Knowledge Graph",
     desc:  "Entity Relationship Map",
+  },
+  {
+    href:  "/rooms",
+    icon:  Users,
+    label: "Research Rooms",
+    desc:  "Collaborative Sessions",
   },
   {
     href:  "#",

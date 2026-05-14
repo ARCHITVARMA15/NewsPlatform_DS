@@ -281,13 +281,15 @@ async def detect_events() -> int:
     last_run_time   = datetime.now(tz=timezone.utc).isoformat()
 
     if new_events:
-        # Persist + broadcast concurrently
+        from app.services.slack_service import notify_breaking_event
+        # Persist + broadcast + Slack alert concurrently
         for event in new_events:
             try:
                 await asyncio.to_thread(_insert_event_sync, event)
             except Exception as exc:
                 logger.warning("[Event Detector] Supabase insert failed: %s", exc)
             await _broadcast(event)
+            await notify_breaking_event(event)
 
         logger.info("[Event Detector] %d new events detected + broadcast", len(new_events))
     else:

@@ -81,25 +81,24 @@
     if (content) content.innerHTML = loadingHTML();
   }
 
-  // ── Fetch analysis from backend ───────────────────────────────────────
+  // ── Fetch analysis via background service worker ─────────────────────
+  // (avoids mixed-content blocking on HTTPS pages fetching HTTP localhost)
   async function fetchAndRender(url, apiUrl) {
-    try {
-      const res = await fetch(`${apiUrl}/api/pipeline/analyze-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, include_bias: true }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-        throw new Error(err.detail || `Server error ${res.status}`);
-      }
-
-      const data = await res.json();
-      renderResults(data);
-    } catch (err) {
-      renderError(err.message || 'Unknown error');
-    }
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: 'FETCH_ANALYZE', url, apiUrl },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            renderError('Extension error: ' + chrome.runtime.lastError.message);
+          } else if (!response || !response.ok) {
+            renderError(response?.error || 'Analysis failed');
+          } else {
+            renderResults(response.data);
+          }
+          resolve();
+        }
+      );
+    });
   }
 
   // ── Render results ────────────────────────────────────────────────────

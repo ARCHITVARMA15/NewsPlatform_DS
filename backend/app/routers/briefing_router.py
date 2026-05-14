@@ -322,6 +322,13 @@ async def generate_briefing(request: BriefingRequest):
     except Exception as exc:
         logger.warning("Could not save briefing to DB (table may not exist): %s", exc)
 
+    # 7 ── Notify Slack (fire-and-forget, never blocks response) ──────────
+    try:
+        from app.services.slack_service import notify_daily_briefing
+        await notify_daily_briefing(script, audio_url)
+    except Exception as exc:
+        logger.warning("Slack briefing notification failed: %s", exc)
+
     return BriefingResponse(
         script=script,
         audio_url=audio_url,

@@ -88,6 +88,7 @@ async function checkConnection(apiUrl) {
   const dot   = document.getElementById('conn-dot');
   const label = document.getElementById('conn-label');
   try {
+    // Popup runs in extension context — can fetch http:// directly (no mixed content issue)
     const res = await fetch(`${apiUrl}/health`, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
       dot.classList.add('connected');

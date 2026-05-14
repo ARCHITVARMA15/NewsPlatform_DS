@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""  # env var: ELEVENLABS_API_KEY
     did_api_key: str = ""         # env var: DID_API_KEY — Base64("email:api_key")
 
+    # Notion MCP
+    notion_token: str = ""         # env var: NOTION_TOKEN
+    notion_database_id: str = ""   # env var: NOTION_DATABASE_ID
+
+    # Slack
+    slack_webhook_url: str = ""    # env var: SLACK_WEBHOOK_URL
+
 
 settings = Settings()
 

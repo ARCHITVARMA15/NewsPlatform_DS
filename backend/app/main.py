@@ -29,6 +29,7 @@ from app.routers.briefing_router import router as briefing_router
 from app.routers.debate_router import router as debate_router
 from app.routers.graph_router import router as graph_router
 from app.routers.events_router import router as events_router
+from app.routers.rooms_router import router as rooms_router
 from app.database.supabase_client import init_supabase_tables
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 
@@ -111,8 +112,8 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:3000", "http://localhost:3001"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -129,6 +130,7 @@ app.include_router(briefing_router)
 app.include_router(debate_router)
 app.include_router(graph_router)
 app.include_router(events_router)
+app.include_router(rooms_router)
 
 
 # ---------------------------------------------------------------------------
