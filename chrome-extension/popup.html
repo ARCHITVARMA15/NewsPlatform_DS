@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Datastraw Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 380px;
+      min-height: 240px;
+      background: #0F172A;
+      color: #E2E8F0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    .header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #1E293B;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 34px;
+      height: 34px;
+      background: #2563EB;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 16px;
+    }
+    .logo-text h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #F8FAFC;
+      line-height: 1;
+    }
+    .logo-text p {
+      font-size: 10px;
+      color: #64748B;
+      margin-top: 2px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .connection-dot {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: #64748B;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #475569;
+    }
+    .dot.connected { background: #22C55E; box-shadow: 0 0 6px #22C55E66; }
+
+    /* ── Body ─────────────────────────────────────────────────────── */
+    .body { padding: 16px 20px; }
+
+    /* Current URL */
+    .url-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+    }
+    .url-display {
+      font-size: 11px;
+      color: #94A3B8;
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 7px 10px;
+      margin-bottom: 16px;
+      word-break: break-all;
+      line-height: 1.4;
+      max-height: 48px;
+      overflow: hidden;
+    }
+
+    /* Analyze button */
+    #analyze-btn {
+      width: 100%;
+      padding: 13px;
+      background: #2563EB;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      letter-spacing: 0.01em;
+    }
+    #analyze-btn:hover:not(:disabled) { background: #1D4ED8; }
+    #analyze-btn:active:not(:disabled) { transform: scale(0.98); }
+    #analyze-btn:disabled {
+      background: #1E40AF;
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Status message */
+    #status {
+      margin-top: 8px;
+      font-size: 11px;
+      text-align: center;
+      min-height: 16px;
+      transition: color 0.2s;
+    }
+    #status.success { color: #22C55E; }
+    #status.error   { color: #EF4444; }
+
+    /* ── Settings accordion ───────────────────────────────────────── */
+    .settings-toggle {
+      width: 100%;
+      background: none;
+      border: none;
+      color: #64748B;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0 6px;
+      margin-top: 10px;
+      border-top: 1px solid #1E293B;
+      transition: color 0.15s;
+    }
+    .settings-toggle:hover { color: #94A3B8; }
+    .settings-toggle .arrow { transition: transform 0.2s; }
+    .settings-toggle.open .arrow { transform: rotate(180deg); }
+
+    .settings-panel {
+      display: none;
+      padding-top: 8px;
+    }
+    .settings-panel.visible { display: block; }
+
+    .setting-row {
+      margin-bottom: 10px;
+    }
+    .setting-row label {
+      display: block;
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .setting-row input {
+      width: 100%;
+      padding: 8px 10px;
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 7px;
+      color: #E2E8F0;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .setting-row input:focus { border-color: #2563EB; }
+
+    #save-settings {
+      width: 100%;
+      padding: 8px;
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #94A3B8;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #save-settings:hover {
+      background: #334155;
+      color: #E2E8F0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">
+      <h1>Datastraw</h1>
+      <p>News Intelligence</p>
+    </div>
+    <div class="connection-dot">
+      <div class="dot" id="conn-dot"></div>
+      <span id="conn-label">checking…</span>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+    <p class="url-label">Current page</p>
+    <div class="url-display" id="current-url">Loading…</div>
+
+    <button id="analyze-btn">⚡ Analyze This Article</button>
+    <div id="status"></div>
+
+    <!-- Settings -->
+    <button class="settings-toggle" id="settings-toggle">
+      <span>Settings</span>
+      <span class="arrow">▾</span>
+    </button>
+    <div class="settings-panel" id="settings-panel">
+      <div class="setting-row">
+        <label for="api-url">Backend API URL</label>
+        <input type="text" id="api-url" placeholder="http://localhost:8000" />
+      </div>
+      <button id="save-settings">Save Settings</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

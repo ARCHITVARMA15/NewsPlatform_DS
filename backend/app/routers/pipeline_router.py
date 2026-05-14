@@ -3,6 +3,7 @@ Pipeline router — /api/pipeline/*
 
 Exposes the NewsData.io ETL pipeline and article retrieval endpoints.
 """
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -119,6 +120,107 @@ async def list_articles(
         sentiment=sentiment,
         search=search,
     )
+
+
+class AnalyzeUrlRequest(BaseModel):
+    url:          str
+    include_bias: bool = False
+
+
+@router.post("/analyze-url", summary="Fetch and AI-analyze any article URL on the fly")
+async def analyze_url(request: AnalyzeUrlRequest):
+    """
+    Fetches and extracts an article from the provided URL using trafilatura,
+    then runs Groq LLaMA-3.3-70B analysis.
+
+    Returns summary, sentiment, insights, key_entities, category,
+    and optionally a bias score.
+    """
+    from fastapi import HTTPException
+    import json as _json
+    import re as _re
+    from datetime import datetime, timezone
+
+    # ── 1. Validate URL ───────────────────────────────────────────────────
+    if not request.url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="URL must start with http:// or https://")
+
+    # ── 2. Fetch + extract with trafilatura ───────────────────────────────
+    try:
+        import trafilatura
+        downloaded = await asyncio.to_thread(trafilatura.fetch_url, request.url)
+        text = await asyncio.to_thread(
+            trafilatura.extract,
+            downloaded,
+            include_comments=False,
+            include_tables=False,
+        )
+    except Exception as exc:
+        logger.error("trafilatura fetch failed for %s: %s", request.url, exc)
+        raise HTTPException(status_code=422, detail=f"Could not fetch article: {exc}")
+
+    if not text or len(text.strip()) < 100:
+        raise HTTPException(
+            status_code=422,
+            detail="Could not extract article content from that URL. "
+                   "The page may require JavaScript or block scraping.",
+        )
+
+    # ── 3. Extract title ──────────────────────────────────────────────────
+    title = text.strip().split("\n")[0][:200]
+
+    # ── 4. Groq AI analysis ───────────────────────────────────────────────
+    bias_instructions = (
+        '\n  "bias_score": <float -1.0 (far left) to 1.0 (far right) or 0 for neutral>,'
+        '\n  "bias_label": "<Far Left|Left|Center-Left|Center|Center-Right|Right|Far Right>",'
+        if request.include_bias else
+        '\n  "bias_score": null,'
+        '\n  "bias_label": null,'
+    )
+
+    prompt = (
+        "Analyze the following news article and return ONLY valid JSON "
+        "(no markdown, no explanation):\n\n"
+        "{\n"
+        '  "summary": "<2 sentence summary>",\n'
+        '  "sentiment": "<positive|negative|neutral>",\n'
+        '  "sentiment_score": <float -1.0 to 1.0>,\n'
+        '  "insights": ["<insight 1>", "<insight 2>", "<insight 3>"],\n'
+        '  "key_entities": ["<entity1>", "<entity2>", "<entity3>"],\n'
+        f'  "category": "<category>",'
+        f"{bias_instructions}\n"
+        "}\n\n"
+        f"Title: {title}\n"
+        f"Content:\n{text[:3000]}"
+    )
+
+    _default = {
+        "summary": "Analysis unavailable.",
+        "sentiment": "neutral",
+        "sentiment_score": 0.0,
+        "insights": [],
+        "key_entities": [],
+        "category": "OTHER",
+        "bias_score": None,
+        "bias_label": None,
+    }
+
+    try:
+        response = await _pipeline.llm.ainvoke(prompt)
+        raw = _re.sub(r"^```(?:json)?\s*|\s*```$", "", response.content.strip(), flags=_re.MULTILINE).strip()
+        analysis = _json.loads(raw)
+        for k, v in _default.items():
+            analysis.setdefault(k, v)
+    except Exception as exc:
+        logger.warning("Groq analysis failed for URL %s: %s", request.url, exc)
+        analysis = _default
+
+    return {
+        **analysis,
+        "url":         request.url,
+        "title":       title,
+        "analyzed_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/articles/{article_id}", summary="Get a single article by article_id")
