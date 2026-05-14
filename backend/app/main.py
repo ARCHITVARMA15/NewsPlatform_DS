@@ -28,6 +28,7 @@ from app.routers.broadcast_router import router as broadcast_router
 from app.routers.briefing_router import router as briefing_router
 from app.routers.debate_router import router as debate_router
 from app.routers.graph_router import router as graph_router
+from app.routers.events_router import router as events_router
 from app.database.supabase_client import init_supabase_tables
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 
@@ -37,12 +38,61 @@ from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from app.services.event_detector import detect_events
+
     logger.info("🚀 Datastraw News Intelligence Backend starting up...")
     logger.info("   LangSmith project : %s", settings.langchain_project)
     logger.info("   SQLite path       : %s", settings.sqlite_db_path)
     logger.info("   Frontend origin   : %s", settings.frontend_url)
     await init_supabase_tables()
+
+    from app.pipelines.news_pipeline import NewsPipeline
+
+    _auto_pipeline = NewsPipeline()
+
+    async def _scheduled_pipeline_run() -> None:
+        from app.routers.pipeline_router import _status
+        if _status.get("is_running"):
+            logger.info("[Scheduler] Pipeline already running — skipping this tick")
+            return
+        logger.info("[Scheduler] Auto-pipeline starting (hourly run)")
+        _status["is_running"] = True
+        try:
+            stats = await _auto_pipeline.run_pipeline(
+                query="latest news", max_articles=50
+            )
+            _status["last_stats"]  = stats
+            _status["last_run_at"] = datetime.now(timezone.utc).isoformat()
+            _status["last_query"]  = "latest news (auto)"
+            logger.info("[Scheduler] Auto-pipeline done: %s", stats)
+        except Exception as exc:
+            logger.error("[Scheduler] Auto-pipeline failed: %s", exc)
+            _status["last_stats"] = {"error": str(exc)}
+        finally:
+            _status["is_running"] = False
+
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        detect_events,
+        "interval",
+        hours=1,
+        id="event_detector",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _scheduled_pipeline_run,
+        "interval",
+        hours=1,
+        id="auto_pipeline",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("[Startup] Event detector + auto-pipeline schedulers started (every 1h)")
+
     yield
+
+    scheduler.shutdown(wait=False)
     logger.info("🛑 Datastraw backend shutting down.")
 
 
@@ -78,6 +128,7 @@ app.include_router(broadcast_router)
 app.include_router(briefing_router)
 app.include_router(debate_router)
 app.include_router(graph_router)
+app.include_router(events_router)
 
 
 # ---------------------------------------------------------------------------

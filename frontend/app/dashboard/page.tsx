@@ -25,6 +25,7 @@ import { FilterBar } from "@/components/dashboard/FilterBar";
 import { SentimentChart } from "@/components/dashboard/SentimentChart";
 import { StatsRow } from "@/components/dashboard/StatsRow";
 import { cn } from "@/lib/utils";
+import { BreakingEventsBar } from "@/components/dashboard/BreakingEventsBar";
 
 // ── Sidebar nav config ────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -263,6 +264,8 @@ export default function DashboardPage() {
 
         {/* Page body */}
         <main className="flex-1 p-6 space-y-6 max-w-[1440px] w-full mx-auto">
+
+          <BreakingEventsBar />
 
           {/* Stats row */}
           <StatsRow
