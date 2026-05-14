@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # Whisper (broadcast analyzer)
     whisper_model: str = "base"   # env var: WHISPER_MODEL
 
+    # AI News Briefing
+    elevenlabs_api_key: str = ""  # env var: ELEVENLABS_API_KEY
+    did_api_key: str = ""         # env var: DID_API_KEY — Base64("email:api_key")
+
 
 settings = Settings()
 

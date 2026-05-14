@@ -236,3 +236,14 @@ export enum RAGAction {
   CLARIFY_WEB     = "clarify_web",
   CONTINUE        = "continue",
 }
+
+// ---------------------------------------------------------------------------
+// AI News Briefing (matches BriefingResponse)
+// ---------------------------------------------------------------------------
+export interface BriefingResponse {
+  script:     string;
+  audio_url:  string;
+  video_url:  string | null;
+  thread_id:  string;
+  created_at: string;
+}

@@ -7,6 +7,7 @@
  */
 import type {
   Article,
+  BriefingResponse,
   ChatMessage,
   ChatSession,
   DashboardStats,
@@ -188,6 +189,29 @@ class APIClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(action),
     });
+  }
+
+  // ── Briefing ──────────────────────────────────────────────────────────── //
+  async generateBriefing(topN: number): Promise<BriefingResponse> {
+    const res = await fetch(`${BASE_URL}/api/briefing/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ top_n: topN, anchor_image_url: null }),
+      signal: AbortSignal.timeout(90_000), // 90s — D-ID can be slow
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`Briefing generation failed (${res.status}): ${detail}`);
+    }
+    return res.json() as Promise<BriefingResponse>;
+  }
+
+  async getLatestBriefings(): Promise<BriefingResponse[]> {
+    try {
+      return await _get<BriefingResponse[]>("/api/briefing/latest");
+    } catch {
+      return [];
+    }
   }
 
   // ── Thread state inspector ────────────────────────────────────────────── //

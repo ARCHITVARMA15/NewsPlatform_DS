@@ -9,7 +9,10 @@ import {
   Github,
   Globe2,
   LayoutDashboard,
+  GitFork,
+  Radio,
   Settings,
+  Swords,
   Tv,
   Zap,
 } from "lucide-react";
@@ -40,6 +43,24 @@ const NAV_ITEMS = [
     icon:  Tv,
     label: "Broadcast Analyzer",
     desc:  "YouTube & Video",
+  },
+  {
+    href:  "/briefing",
+    icon:  Radio,
+    label: "AI Briefing",
+    desc:  "Daily Audio & Video",
+  },
+  {
+    href:  "/debate",
+    icon:  Swords,
+    label: "Debate Arena",
+    desc:  "Multi-Agent Debate",
+  },
+  {
+    href:  "/graph",
+    icon:  GitFork,
+    label: "Knowledge Graph",
+    desc:  "Entity Relationship Map",
   },
   {
     href:  "#",

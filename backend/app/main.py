@@ -25,6 +25,9 @@ from app.routers.agent_router import router as agent_router
 from app.routers.rag_router import router as rag_router
 from app.routers.dashboard_router import router as dashboard_router
 from app.routers.broadcast_router import router as broadcast_router
+from app.routers.briefing_router import router as briefing_router
+from app.routers.debate_router import router as debate_router
+from app.routers.graph_router import router as graph_router
 from app.database.supabase_client import init_supabase_tables
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 
@@ -72,6 +75,9 @@ app.include_router(agent_router)
 app.include_router(rag_router)
 app.include_router(dashboard_router)
 app.include_router(broadcast_router)
+app.include_router(briefing_router)
+app.include_router(debate_router)
+app.include_router(graph_router)
 
 
 # ---------------------------------------------------------------------------
