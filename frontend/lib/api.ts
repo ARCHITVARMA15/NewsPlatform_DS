@@ -117,6 +117,19 @@ class APIClient {
     return res.json() as Promise<PDFMetadata>;
   }
 
+  async uploadFromDrive(driveUrl: string, threadId?: string): Promise<PDFMetadata> {
+    const res = await fetch(`${BASE_URL}/api/rag/upload-drive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ drive_url: driveUrl, thread_id: threadId || null }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Drive import failed" }));
+      throw new Error(body.detail || `Drive import failed (${res.status})`);
+    }
+    return res.json() as Promise<PDFMetadata>;
+  }
+
   // ── Sessions ──────────────────────────────────────────────────────────── //
   async getAgentSessions(): Promise<ChatSession[]> {
     return _get<ChatSession[]>("/api/agent/sessions");

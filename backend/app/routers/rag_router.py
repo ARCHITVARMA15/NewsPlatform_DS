@@ -12,7 +12,11 @@ import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import re
+
+import httpx
 from fastapi import APIRouter, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.agents.rag_agent.graph import create_rag_graph, stream_rag_agent
@@ -116,6 +120,126 @@ async def upload_pdf(
         "chunk_count": chunk_count,
         "page_count": page_count,
         "file_size_kb": round(len(file_bytes) / 1024, 1),
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /upload-drive — ingest a PDF from a public Google Drive link
+# ---------------------------------------------------------------------------
+class DriveUploadRequest(BaseModel):
+    drive_url: str
+    thread_id: str | None = None
+
+
+def _extract_drive_file_id(url: str) -> str | None:
+    """
+    Extracts the file ID from common Google Drive URL formats:
+      - https://drive.google.com/file/d/FILE_ID/view
+      - https://drive.google.com/open?id=FILE_ID
+      - https://drive.google.com/uc?id=FILE_ID
+    """
+    match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", url)
+    if match:
+        return match.group(1)
+    match = re.search(r"[?&]id=([a-zA-Z0-9_-]+)", url)
+    if match:
+        return match.group(1)
+    return None
+
+
+@router.post("/upload-drive", summary="Import a PDF from a public Google Drive link")
+async def upload_from_drive(body: DriveUploadRequest):
+    """
+    Accepts a public Google Drive share link, downloads the PDF,
+    and processes it identically to /upload-pdf.
+    The file must be shared as 'Anyone with the link can view'.
+    """
+    file_id = _extract_drive_file_id(body.drive_url)
+    if not file_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not extract a file ID from the provided Drive URL. "
+                   "Make sure it's a valid drive.google.com share link.",
+        )
+
+    download_url = (
+        f"https://drive.usercontent.google.com/download"
+        f"?id={file_id}&export=download&authuser=0&confirm=t"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+            res = await client.get(download_url)
+            if res.status_code != 200:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Google Drive returned {res.status_code}. "
+                           "Ensure the file is shared as 'Anyone with the link'.",
+                )
+            file_bytes = res.content
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to download from Drive: {exc}")
+
+    if len(file_bytes) > _MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"PDF exceeds 20 MB ({len(file_bytes) / 1_048_576:.1f} MB).",
+        )
+
+    # Verify it's actually a PDF
+    if not file_bytes.startswith(b"%PDF"):
+        raise HTTPException(
+            status_code=400,
+            detail="The downloaded file does not appear to be a PDF. "
+                   "Make sure the Drive file is a PDF and is publicly shared.",
+        )
+
+    actual_thread_id = body.thread_id or str(uuid4())
+    filename = f"drive_{file_id[:8]}.pdf"
+
+    tmp_path = f"/tmp/pdf_upload_{actual_thread_id}.pdf"
+    with open(tmp_path, "wb") as fh:
+        fh.write(file_bytes)
+
+    try:
+        chunks: list[dict] = await asyncio.to_thread(
+            chunk_pdf.invoke, {"file_bytes": file_bytes, "filename": filename}
+        )
+        await asyncio.to_thread(
+            embed_and_store_chunks.invoke,
+            {"chunks": chunks, "thread_id": actual_thread_id},
+        )
+    except Exception as exc:
+        logger.error("Drive PDF processing failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"PDF processing failed: {exc}")
+
+    page_count  = max((c.get("page_num", 0) for c in chunks), default=0)
+    chunk_count = len(chunks)
+
+    try:
+        supabase.table("pdf_documents").insert({
+            "thread_id":  actual_thread_id,
+            "filename":   filename,
+            "file_size":  len(file_bytes),
+            "chunk_count": chunk_count,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception as exc:
+        logger.warning("Supabase pdf_documents insert failed: %s", exc)
+
+    logger.info(
+        "Drive PDF ingested: thread=%s file_id=%s chunks=%d pages=%d",
+        actual_thread_id, file_id, chunk_count, page_count,
+    )
+    return {
+        "thread_id":    actual_thread_id,
+        "filename":     filename,
+        "chunk_count":  chunk_count,
+        "page_count":   page_count,
+        "file_size_kb": round(len(file_bytes) / 1024, 1),
+        "file_id":      file_id,
     }
 
 

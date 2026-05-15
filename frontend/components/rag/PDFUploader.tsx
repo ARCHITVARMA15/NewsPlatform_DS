@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
+  HardDriveDownload,
+  Link2,
   Loader2,
   Trash2,
   UploadCloud,
@@ -32,10 +34,13 @@ export function PDFUploader({
   onPDFRemoved,
   activePDF,
 }: PDFUploaderProps) {
-  const [isExpanded, setIsExpanded] = useState(!activePDF);
-  const [uploading, setUploading]   = useState(false);
-  const [progress, setProgress]     = useState(0);
-  const [error, setError]           = useState<string | null>(null);
+  const [isExpanded,  setIsExpanded]  = useState(!activePDF);
+  const [uploading,   setUploading]   = useState(false);
+  const [progress,    setProgress]    = useState(0);
+  const [error,       setError]       = useState<string | null>(null);
+  const [tab,         setTab]         = useState<"file" | "drive">("file");
+  const [driveUrl,    setDriveUrl]    = useState("");
+  const [driveLoading, setDriveLoading] = useState(false);
 
   // ── Upload handler ───────────────────────────────────────────────────
   const handleUpload = useCallback(
@@ -68,6 +73,23 @@ export function PDFUploader({
     },
     [threadId, onPDFReady]
   );
+
+  // ── Drive URL handler ─────────────────────────────────────────────────
+  const handleDriveImport = async () => {
+    if (!driveUrl.trim()) return;
+    setError(null);
+    setDriveLoading(true);
+    try {
+      const meta = await api.uploadFromDrive(driveUrl.trim(), threadId);
+      setDriveUrl("");
+      setIsExpanded(false);
+      onPDFReady(meta);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Drive import failed.");
+    } finally {
+      setDriveLoading(false);
+    }
+  };
 
   // ── Dropzone config ──────────────────────────────────────────────────
   const onDrop = useCallback(
@@ -172,8 +194,59 @@ export function PDFUploader({
             className="overflow-hidden"
           >
             <div className="px-4 pb-4 pt-1 space-y-3">
-              {/* Drop zone */}
-              <div
+              {/* Tab switcher */}
+              <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setTab("file")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-1.5 rounded-md transition-all ${
+                    tab === "file" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <UploadCloud className="size-3.5" /> Upload File
+                </button>
+                <button
+                  onClick={() => setTab("drive")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-1.5 rounded-md transition-all ${
+                    tab === "drive" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <HardDriveDownload className="size-3.5" /> Google Drive
+                </button>
+              </div>
+
+              {/* Drive URL input */}
+              {tab === "drive" && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">
+                    Paste a public Google Drive share link. File must be shared as
+                    <span className="font-semibold text-slate-700"> Anyone with the link</span>.
+                  </p>
+                  <div className="flex gap-2">
+                    <div className="flex-1 flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50">
+                      <Link2 className="size-3.5 text-slate-400 flex-shrink-0" />
+                      <input
+                        type="url"
+                        value={driveUrl}
+                        onChange={(e) => setDriveUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleDriveImport()}
+                        placeholder="https://drive.google.com/file/d/…/view"
+                        className="flex-1 bg-transparent text-xs text-slate-700 placeholder:text-slate-400 outline-none"
+                      />
+                    </div>
+                    <button
+                      onClick={handleDriveImport}
+                      disabled={driveLoading || !driveUrl.trim()}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {driveLoading ? <Loader2 className="size-3.5 animate-spin" /> : <HardDriveDownload className="size-3.5" />}
+                      Import
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Drop zone — only shown in file tab */}
+              {tab === "file" && <div
                 {...getRootProps()}
                 className={cn(
                   "border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all",
@@ -224,7 +297,7 @@ export function PDFUploader({
                     </p>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* Error message */}
               <AnimatePresence>
