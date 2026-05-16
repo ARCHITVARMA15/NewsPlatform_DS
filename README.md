@@ -58,6 +58,8 @@ Install into Chrome as an unpacked extension. On any news article, click the ⚡
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js 14, TypeScript, Tailwind CSS, Framer Motion |
+| State Management | Redux Toolkit + Redux Persist (conversations survive navigation) |
+| Auth | Supabase Auth (email/password + Google OAuth) |
 | Backend | FastAPI, Python 3.11+ |
 | LLM | Groq (LLaMA 3.3 70B Versatile) |
 | Agent Framework | LangGraph with SQLite checkpointer |
@@ -124,7 +126,9 @@ cp .env.example .env
 ```bash
 cd frontend
 npm install
-# NEXT_PUBLIC_API_URL=http://localhost:8000 is pre-configured
+cp .env.example .env.local
+# → Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+# NEXT_PUBLIC_API_URL defaults to http://localhost:8000
 ```
 
 ### 4. Start
@@ -151,20 +155,24 @@ Visit **http://localhost:3000** ✅
 
 ## API Keys
 
-| Key | Service | Where to get it | Required? |
-|---|---|---|---|
-| `GROQ_API_KEY` | LLM | [console.groq.com](https://console.groq.com) | ✅ Yes |
-| `TAVILY_API_KEY` | Web search | [app.tavily.com](https://app.tavily.com) | ✅ Yes |
-| `NEWSDATA_API_KEY` | News articles | [newsdata.io](https://newsdata.io) | ✅ Yes |
-| `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` | Database | [supabase.com](https://supabase.com) | ✅ Yes |
-| `LANGCHAIN_API_KEY` | Tracing | [smith.langchain.com](https://smith.langchain.com) | Optional |
-| `ELEVENLABS_API_KEY` | Voice synthesis | [elevenlabs.io](https://elevenlabs.io) | Optional |
-| `DID_API_KEY` | Talking-head video | [d-id.com](https://www.d-id.com) | Optional |
-| `SLACK_WEBHOOK_URL` | Slack alerts | [api.slack.com/apps](https://api.slack.com/apps) → Incoming Webhooks | Optional |
-| `NOTION_TOKEN` + `NOTION_DATABASE_ID` | Notion export | [notion.so/my-integrations](https://www.notion.so/my-integrations) | Optional |
+| Key | Service | Where to get it | File | Required? |
+|---|---|---|---|---|
+| `GROQ_API_KEY` | LLM | [console.groq.com](https://console.groq.com) | backend `.env` | ✅ Yes |
+| `TAVILY_API_KEY` | Web search | [app.tavily.com](https://app.tavily.com) | backend `.env` | ✅ Yes |
+| `NEWSDATA_API_KEY` | News articles | [newsdata.io](https://newsdata.io) | backend `.env` | ✅ Yes |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` | Database | [supabase.com](https://supabase.com) | backend `.env` | ✅ Yes |
+| `SUPABASE_JWT_SECRET` | Auth token verification | Supabase Dashboard → Settings → JWT Keys → Legacy JWT Secret | backend `.env` | ✅ Yes |
+| `NEXT_PUBLIC_SUPABASE_URL` | Auth (frontend) | Same Supabase project URL | frontend `.env.local` | ✅ Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Auth (frontend) | Supabase Dashboard → API → anon public key | frontend `.env.local` | ✅ Yes |
+| `LANGCHAIN_API_KEY` | Tracing | [smith.langchain.com](https://smith.langchain.com) | backend `.env` | Optional |
+| `ELEVENLABS_API_KEY` | Voice synthesis | [elevenlabs.io](https://elevenlabs.io) | backend `.env` | Optional |
+| `DID_API_KEY` | Talking-head video | [d-id.com](https://www.d-id.com) | backend `.env` | Optional |
+| `SLACK_WEBHOOK_URL` | Slack alerts | [api.slack.com/apps](https://api.slack.com/apps) → Incoming Webhooks | backend `.env` | Optional |
+| `NOTION_TOKEN` + `NOTION_DATABASE_ID` | Notion export | [notion.so/my-integrations](https://www.notion.so/my-integrations) | backend `.env` | Optional |
 
 > Set `LANGCHAIN_TRACING_V2=false` to disable LangSmith tracing.  
-> `DID_API_KEY` must be Base64-encoded as `"email:api_key"` — see `.env.example` for instructions.
+> `DID_API_KEY` must be Base64-encoded as `"email:api_key"` — see `backend/.env.example` for instructions.  
+> `SUPABASE_JWT_SECRET` is the **Legacy JWT Secret (HS256)** — find it under Dashboard → Settings → JWT Keys → "Legacy JWT Secret" tab.
 
 ---
 
@@ -219,15 +227,17 @@ datastraw/
 │   │   │   └── broadcast_agent/     # Broadcast Analyzer (Whisper + LangGraph)
 │   │   ├── routers/
 │   │   │   ├── pipeline_router.py   # /api/pipeline — news ingestion pipeline
-│   │   │   ├── agent_router.py      # /api/agent — News Intelligence Agent
-│   │   │   ├── rag_router.py        # /api/rag — RAG chatbot + Drive import
+│   │   │   ├── agent_router.py      # /api/agent — News Intelligence Agent (auth-gated)
+│   │   │   ├── rag_router.py        # /api/rag — RAG chatbot + Drive import (auth-gated)
 │   │   │   ├── broadcast_router.py  # /api/broadcast — YouTube/video analysis
 │   │   │   ├── dashboard_router.py  # /api/dashboard — stats and feeds
 │   │   │   ├── briefing_router.py   # /api/briefing — AI news briefing
-│   │   │   ├── debate_router.py     # /api/debate — AI debate arena
+│   │   │   ├── debate_router.py     # /api/debate — AI debate arena (auth-gated)
 │   │   │   ├── graph_router.py      # /api/graph — knowledge graph
 │   │   │   ├── events_router.py     # /api/events — breaking event SSE stream
 │   │   │   └── rooms_router.py      # /api/rooms — collaborative research rooms
+│   │   ├── middleware/
+│   │   │   └── auth_middleware.py   # Supabase JWT verification (get_current_user)
 │   │   ├── services/
 │   │   │   ├── event_detector.py    # DBSCAN clustering + Slack alerts
 │   │   │   └── slack_service.py     # Slack webhook notification helpers
@@ -246,6 +256,10 @@ datastraw/
 │
 ├── frontend/
 │   ├── app/
+│   │   ├── layout.tsx               # Root layout (Redux + Auth providers)
+│   │   ├── page.tsx                 # Root redirect (→ /login or /dashboard)
+│   │   ├── login/page.tsx           # Email/password + Google OAuth login
+│   │   ├── auth/callback/route.ts   # Supabase OAuth callback handler
 │   │   ├── dashboard/page.tsx       # Intelligence feed
 │   │   ├── agent/page.tsx           # News Intelligence Agent
 │   │   ├── rag/page.tsx             # RAG Chatbot + Drive import
@@ -255,15 +269,39 @@ datastraw/
 │   │   ├── graph/page.tsx           # Knowledge Graph
 │   │   └── rooms/page.tsx           # Collaborative Research Rooms
 │   ├── components/
+│   │   ├── auth/
+│   │   │   ├── AuthProvider.tsx     # Supabase session sync → Redux
+│   │   │   └── UserAvatar.tsx       # User menu + sign-out in sidebar
 │   │   ├── agent/                   # AgentChat, BiasHeatmap, etc.
 │   │   ├── rag/                     # RAGChat, PDFUploader (w/ Drive tab)
 │   │   ├── broadcast/               # BroadcastChat, ProcessingProgress
+│   │   ├── briefing/                # BriefingPlayer, BriefingCard
+│   │   ├── debate/                  # DebateArena, ArgumentBubble
+│   │   ├── dashboard/               # ArticleCard, StatsGrid, etc.
+│   │   ├── graph/                   # KnowledgeGraph (D3 force-directed)
 │   │   ├── rooms/                   # RoomLobby, RoomSession
 │   │   └── shared/                  # Sidebar, ThreadHistory
-│   └── lib/
-│       ├── streaming.ts             # useAgentStream SSE hook
-│       ├── api.ts                   # API client (incl. Drive + Notion)
-│       └── types.ts                 # TypeScript interfaces
+│   ├── store/
+│   │   ├── index.ts                 # Redux store + redux-persist config
+│   │   ├── hooks.ts                 # useAppDispatch, useAgentState, etc.
+│   │   ├── Provider.tsx             # <ReduxProvider> + <PersistGate>
+│   │   └── slices/
+│   │       ├── authSlice.ts         # User identity + access token
+│   │       ├── agentSlice.ts        # Agent conversation (messages, threadId)
+│   │       ├── ragSlice.ts          # RAG conversation + PDF metadata
+│   │       ├── debateSlice.ts       # Debate topic, history, phase, conclusion
+│   │       └── uiSlice.ts           # Sidebar collapse and UI preferences
+│   ├── lib/
+│   │   ├── streaming.ts             # useAgentStream — SSE hook backed by Redux
+│   │   ├── api.ts                   # API client (auth headers, Drive, Notion)
+│   │   ├── supabase/
+│   │   │   ├── client.ts            # Browser-side Supabase client
+│   │   │   └── server.ts            # Server-side Supabase client (SSR cookies)
+│   │   ├── types.ts                 # TypeScript interfaces
+│   │   └── utils.ts                 # cn() and shared helpers
+│   ├── middleware.ts                # Next.js route protection (auth guard)
+│   ├── .env.example                 # Frontend env template
+│   └── package.json
 │
 └── chrome-extension/
     ├── manifest.json                # Manifest V3
