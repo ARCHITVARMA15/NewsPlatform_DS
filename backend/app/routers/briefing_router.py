@@ -119,24 +119,51 @@ async def generate_briefing_script(articles: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 # Helper 3 — generate voice with ElevenLabs (sync wrapped in executor)
 # ---------------------------------------------------------------------------
+_VOICE_IDS: dict[str, str] = {
+    "Rachel":  "21m00Tcm4TlvDq8ikWAM",
+    "Adam":    "pNInz6obpgDQGcFmaJgB",
+    "Bella":   "EXAVITQu4vr4xnSDxMaL",
+    "Antoni":  "ErXwobaYiN019PkySvjV",
+    "Elli":    "MF3mGyEYCl7XYWbV9V6O",
+    "Josh":    "TxGEqnHWrfWFTfGW9XjX",
+    "Sam":     "yoZ06aMxZJJ28mfd3POQ",
+}
+
+
 async def generate_voice(script: str, voice_id: str) -> bytes:
     """
-    Calls ElevenLabs text-to-speech API and returns mp3 audio bytes.
-    Runs synchronous SDK call in a thread executor to avoid blocking.
+    Calls ElevenLabs TTS (if API key set + paid plan) and falls back to
+    gTTS (Google TTS, free, no key required) automatically.
 
-    Free-tier voice IDs that work without a paid plan:
-      Rachel, Adam, Bella, Antoni, Elli, Josh, Sam
+    Free-tier voices: Rachel, Adam, Bella, Antoni, Elli, Josh, Sam
+    Accepts both voice names (e.g. "Rachel") and raw voice IDs.
     """
-    def _sync_generate() -> bytes:
-        from elevenlabs.client import ElevenLabs  # imported here — optional dep
+    resolved_id = _VOICE_IDS.get(voice_id, voice_id)
 
+    def _elevenlabs() -> bytes:
+        from elevenlabs.client import ElevenLabs
         client = ElevenLabs(api_key=settings.elevenlabs_api_key)
-        audio = client.generate(
+        audio = client.text_to_speech.convert(
+            voice_id=resolved_id,
             text=script,
-            voice=voice_id,
-            model="eleven_monolingual_v1",
+            model_id="eleven_turbo_v2_5",
         )
         return b"".join(audio)
+
+    def _gtts_fallback() -> bytes:
+        import io
+        from gtts import gTTS
+        buf = io.BytesIO()
+        gTTS(text=script, lang="en", slow=False).write_to_fp(buf)
+        return buf.getvalue()
+
+    def _sync_generate() -> bytes:
+        if settings.elevenlabs_api_key:
+            try:
+                return _elevenlabs()
+            except Exception as exc:
+                logger.warning("ElevenLabs failed (%s) — falling back to gTTS", exc)
+        return _gtts_fallback()
 
     return await asyncio.to_thread(_sync_generate)
 

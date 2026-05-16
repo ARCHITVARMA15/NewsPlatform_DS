@@ -143,7 +143,7 @@ def _get_room_sync(room_code: str) -> dict | None:
         .maybe_single()
         .execute()
     )
-    return result.data
+    return result.data if result else None
 
 
 def _get_history_sync(room_code: str, limit: int = 100) -> list[dict]:

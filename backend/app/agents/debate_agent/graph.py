@@ -125,7 +125,9 @@ async def stream_debate(
             if ev_type != "on_chain_end":
                 continue
 
-            output: dict = event.get("data", {}).get("output", {})
+            output = event.get("data", {}).get("output", {})
+            if not isinstance(output, dict):
+                continue
 
             # ── Optimist argument ─────────────────────────────────────
             if node_name == "optimist":

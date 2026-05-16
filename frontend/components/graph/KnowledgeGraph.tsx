@@ -23,7 +23,7 @@ import type { Article } from "@/lib/types";
 
 // ── ForceGraph2D — dynamic import (canvas API, no SSR) ────────────────────
 const ForceGraph2D = dynamic(
-  () => import("react-force-graph").then(m => ({ default: m.ForceGraph2D })),
+  () => import("react-force-graph-2d"),
   { ssr: false, loading: () => <GraphLoadingScreen /> }
 );
 
