@@ -30,6 +30,7 @@ from app.routers.debate_router import router as debate_router
 from app.routers.graph_router import router as graph_router
 from app.routers.events_router import router as events_router
 from app.routers.rooms_router import router as rooms_router
+from app.routers.notion_router import router as notion_router
 from app.database.supabase_client import init_supabase_tables
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 
@@ -131,6 +132,7 @@ app.include_router(debate_router)
 app.include_router(graph_router)
 app.include_router(events_router)
 app.include_router(rooms_router)
+app.include_router(notion_router)
 
 
 # ---------------------------------------------------------------------------

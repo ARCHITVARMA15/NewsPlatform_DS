@@ -244,6 +244,26 @@ class APIClient {
     }
   }
 
+  // ── Notion ────────────────────────────────────────────────────────────── //
+  async getNotionStatus(): Promise<{ configured: boolean }> {
+    return _get<{ configured: boolean }>("/api/notion/status");
+  }
+
+  async saveArticleToNotion(article: {
+    title: string;
+    source_name?: string;
+    summary?: string;
+    url?: string;
+    sentiment?: string;
+    category?: string;
+  }): Promise<{ success: boolean; page_url?: string; error?: string }> {
+    return _post("/api/notion/save-article", article);
+  }
+
+  async saveBriefingToNotion(script: string, audioUrl: string): Promise<{ success: boolean; page_url?: string; error?: string }> {
+    return _post("/api/notion/save-briefing", { script, audio_url: audioUrl });
+  }
+
   // ── Thread state inspector ────────────────────────────────────────────── //
   async getThreadState(threadId: string): Promise<{
     agent: string;

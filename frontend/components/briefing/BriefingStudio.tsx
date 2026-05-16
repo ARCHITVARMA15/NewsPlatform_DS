@@ -64,6 +64,8 @@ export function BriefingStudio({ preloaded, onGenerated }: BriefingStudioProps) 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [copied,        setCopied]        = useState(false);
   const [articles,      setArticles]      = useState<Article[]>([]);
+  const [notionState,   setNotionState]   = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [slackSent,     setSlackSent]     = useState(false);
 
   const audioRef   = useRef<HTMLAudioElement | null>(null);
   const timerRefs  = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -75,9 +77,24 @@ export function BriefingStudio({ preloaded, onGenerated }: BriefingStudioProps) 
     setAudioUrl(preloaded.audio_url);
     setVideoUrl(preloaded.video_url);
     setPhase("ready");
+    setSlackSent(false);
     fetchArticles(5);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preloaded]);
+
+  // ── Save to Notion ────────────────────────────────────────────────────────
+  const handleSaveToNotion = async () => {
+    if (notionState === "saving" || notionState === "saved") return;
+    setNotionState("saving");
+    try {
+      const res = await api.saveBriefingToNotion(script, audioUrl ?? "");
+      setNotionState(res.success ? "saved" : "error");
+      if (res.success && res.page_url) window.open(res.page_url, "_blank");
+    } catch {
+      setNotionState("error");
+    }
+    setTimeout(() => setNotionState("idle"), 3000);
+  };
 
   // ── Cleanup timers on unmount ────────────────────────────────────────────
   useEffect(() => {
@@ -116,6 +133,7 @@ export function BriefingStudio({ preloaded, onGenerated }: BriefingStudioProps) 
       // Brief pause so user sees the final step animation
       await new Promise(r => setTimeout(r, 600));
       setPhase("ready");
+      setSlackSent(true);
       fetchArticles(topN);
       onGenerated?.();
     } catch (err: unknown) {
@@ -344,10 +362,15 @@ export function BriefingStudio({ preloaded, onGenerated }: BriefingStudioProps) 
             >
               {/* Top action bar */}
               <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <CheckCircle2 className="size-4 text-emerald-500" />
                   <span className="text-sm font-semibold text-slate-700">Briefing Ready</span>
                   <span className="text-[11px] text-slate-400">{today}</span>
+                  {slackSent && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      <Check className="size-2.5" /> Slack notified
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={() => { setPhase("idle"); setError(null); }}
@@ -460,14 +483,33 @@ export function BriefingStudio({ preloaded, onGenerated }: BriefingStudioProps) 
                     </div>
                   </div>
 
-                  {/* Share button */}
-                  <div className="flex justify-center">
+                  {/* Share + Notion row */}
+                  <div className="flex items-center justify-center gap-3 flex-wrap">
                     <button
                       onClick={shareBriefing}
                       className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all"
                     >
                       <Share2 className="size-4" />
                       {copied ? "Copied to clipboard!" : "Share Briefing"}
+                    </button>
+                    <button
+                      onClick={handleSaveToNotion}
+                      className={cn(
+                        "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border transition-all",
+                        notionState === "saved"  ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                        notionState === "error"  ? "bg-red-50 text-red-500 border-red-200" :
+                        notionState === "saving" ? "bg-slate-50 text-slate-400 border-slate-200 cursor-wait" :
+                        "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      )}
+                    >
+                      {notionState === "saving" ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : notionState === "saved" ? (
+                        <Check className="size-4" />
+                      ) : (
+                        <svg className="size-4" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279V9.34l-1.215-.14c-.093-.514.28-.887.747-.933z"/></svg>
+                      )}
+                      {notionState === "saved" ? "Saved to Notion!" : notionState === "error" ? "Notion failed" : "Save to Notion"}
                     </button>
                   </div>
 

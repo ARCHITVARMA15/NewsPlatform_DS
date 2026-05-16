@@ -1,10 +1,11 @@
 "use client";
 
-import { Globe, MessageSquare } from "lucide-react";
+import { Check, Globe, Loader2, MessageSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import type { Article } from "@/lib/types";
 
 interface ArticleCardProps {
@@ -61,6 +62,27 @@ const PILL_COLORS = [
 export function ArticleCard({ article }: ArticleCardProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [notionState, setNotionState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const handleSaveToNotion = async () => {
+    if (notionState === "saving" || notionState === "saved") return;
+    setNotionState("saving");
+    try {
+      const res = await api.saveArticleToNotion({
+        title:       article.title       ?? "Untitled",
+        source_name: article.source_name ?? "",
+        summary:     article.summary     ?? "",
+        url:         article.source_url ?? "",
+        sentiment:   article.sentiment   ?? "neutral",
+        category:    article.category    ?? "General",
+      });
+      setNotionState(res.success ? "saved" : "error");
+      if (res.success && res.page_url) window.open(res.page_url, "_blank");
+    } catch {
+      setNotionState("error");
+    }
+    setTimeout(() => setNotionState("idle"), 3000);
+  };
 
   const credibility = getCredibilityInfo(article.source_name);
   const sentimentKey = (article.sentiment ?? "neutral") as keyof typeof SENTIMENT_MAP;
@@ -174,13 +196,35 @@ export function ArticleCard({ article }: ArticleCardProps) {
           <span className="text-base leading-none">{sentiment.emoji}</span>
           <span>{relativeTime}</span>
         </div>
-        <button
-          onClick={handleAskAI}
-          className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-all"
-        >
-          <MessageSquare className="size-3.5" />
-          Ask AI
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleSaveToNotion}
+            title="Save to Notion"
+            className={cn(
+              "flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all",
+              notionState === "saved"  && "bg-emerald-50 text-emerald-600",
+              notionState === "error"  && "bg-red-50 text-red-500",
+              notionState === "saving" && "bg-slate-50 text-slate-400 cursor-wait",
+              notionState === "idle"   && "bg-slate-100 text-slate-500 hover:bg-slate-200",
+            )}
+          >
+            {notionState === "saving" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : notionState === "saved" ? (
+              <Check className="size-3.5" />
+            ) : (
+              <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279V9.34l-1.215-.14c-.093-.514.28-.887.747-.933z"/></svg>
+            )}
+            {notionState === "saved" ? "Saved!" : notionState === "error" ? "Failed" : "Notion"}
+          </button>
+          <button
+            onClick={handleAskAI}
+            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-all"
+          >
+            <MessageSquare className="size-3.5" />
+            Ask AI
+          </button>
+        </div>
       </div>
     </article>
   );
