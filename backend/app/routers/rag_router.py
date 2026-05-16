@@ -15,13 +15,14 @@ from uuid import uuid4
 import re
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.agents.rag_agent.graph import create_rag_graph, stream_rag_agent
 from app.agents.rag_agent.tools import chunk_pdf, embed_and_store_chunks
 from app.database.models import HumanLoopAction, RAGRequest
+from app.middleware.auth_middleware import get_current_user
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 from app.database.supabase_client import (
     get_chat_sessions,
@@ -50,6 +51,7 @@ def _stream_response(generator) -> StreamingResponse:
 async def upload_pdf(
     file: UploadFile,
     thread_id: str | None = Query(None, description="Reuse an existing thread or omit to create new"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Accepts a PDF file (max 20 MB), chunks it, embeds it into an in-memory
@@ -247,7 +249,7 @@ async def upload_from_drive(body: DriveUploadRequest):
 # POST /chat — start a RAG session
 # ---------------------------------------------------------------------------
 @router.post("/chat", summary="Start a streaming RAG chat session")
-async def chat(request: RAGRequest):
+async def chat(request: RAGRequest, current_user: dict = Depends(get_current_user)):
     """
     Streams SSE events for a RAG Agent session.
 

@@ -30,3 +30,4 @@ trafilatura
 numpy
 apscheduler
 notion-client
+PyJWT

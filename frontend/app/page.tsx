@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import Link from "next/link";
 import {
   ArrowRight,
@@ -14,7 +16,13 @@ import {
   Zap,
 } from "lucide-react";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) redirect("/dashboard")
+  else redirect("/login")
+
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-[#0a0f18] text-slate-100 overflow-x-hidden">
 

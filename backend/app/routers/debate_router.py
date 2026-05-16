@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 from langchain_groq import ChatGroq
@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from app.agents.debate_agent.graph import stream_debate
 from app.config import settings
+from app.middleware.auth_middleware import get_current_user
 from app.database.supabase_client import get_article_by_id, get_articles
 
 logger = logging.getLogger("datastraw.router.debate")
@@ -68,7 +69,7 @@ def _stream_response(generator, thread_id: str) -> StreamingResponse:
     "/start",
     summary="Start a Multi-Agent Debate on a news topic (SSE streaming)",
 )
-async def start_debate(request: DebateRequest):
+async def start_debate(request: DebateRequest, current_user: dict = Depends(get_current_user)):
     """
     Streams a structured debate between the Optimist Analyst and Skeptic Analyst
     over the provided topic. Both agents are powered by Groq LLaMA-3.3-70b.

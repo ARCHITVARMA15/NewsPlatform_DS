@@ -9,11 +9,12 @@ import logging
 import os
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.agents.news_agent.graph import stream_news_agent
 from app.database.models import AgentRequest, HumanLoopAction
+from app.middleware.auth_middleware import get_current_user
 from app.database.sqlite_checkpointer import get_checkpointer, get_thread_config
 from app.database.supabase_client import (
     get_chat_sessions,
@@ -36,7 +37,7 @@ def _stream_response(generator) -> StreamingResponse:
 # POST /chat — start a new agent run
 # ---------------------------------------------------------------------------
 @router.post("/chat", summary="Start a streaming News Intelligence Agent session")
-async def chat(request: AgentRequest):
+async def chat(request: AgentRequest, current_user: dict = Depends(get_current_user)):
     """
     Streams SSE events for a full agent run.
     Generates a thread_id if not provided.
@@ -76,7 +77,7 @@ async def chat(request: AgentRequest):
 # POST /action — resume after HITL interrupt
 # ---------------------------------------------------------------------------
 @router.post("/action", summary="Resume an interrupted agent session with a user action")
-async def action(body: HumanLoopAction):
+async def action(body: HumanLoopAction, current_user: dict = Depends(get_current_user)):
     """
     Resumes the graph from the HITL interrupt point.
     Provide the thread_id from the interrupted session and the chosen action.

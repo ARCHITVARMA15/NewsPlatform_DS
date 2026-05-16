@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # Slack
     slack_webhook_url: str = ""    # env var: SLACK_WEBHOOK_URL
 
+    # Auth — Supabase JWT verification
+    supabase_jwt_secret: str = ""  # env var: SUPABASE_JWT_SECRET (Settings → API → JWT Secret)
+
 
 settings = Settings()
 
