@@ -1,24 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-
-interface Message {
-  id: string
-  role: 'user' | 'agent'
-  content: string
-  timestamp: string
-  metadata?: {
-    summary?: string
-    insights?: string[]
-    sentiment?: string
-    confidence_scores?: Record<string, number>
-    sources?: unknown[]
-    isInterrupted?: boolean
-    availableActions?: string[]
-    pdfPath?: string
-  }
-}
+import type { StreamMessage } from '@/lib/types'
 
 interface AgentState {
-  messages: Message[]
+  messages: StreamMessage[]
   threadId: string | null
   isStreaming: boolean
   currentStep: string | null
@@ -46,10 +30,13 @@ const agentSlice = createSlice({
     setThreadId(state, action: PayloadAction<string>) {
       state.threadId = action.payload
     },
-    addMessage(state, action: PayloadAction<Message>) {
+    addMessage(state, action: PayloadAction<StreamMessage>) {
       state.messages.push(action.payload)
     },
-    updateLastMessage(state, action: PayloadAction<Partial<Message>>) {
+    setMessages(state, action: PayloadAction<StreamMessage[]>) {
+      state.messages = action.payload
+    },
+    updateLastMessage(state, action: PayloadAction<Partial<StreamMessage>>) {
       const last = state.messages[state.messages.length - 1]
       if (last) {
         Object.assign(last, action.payload)
@@ -80,7 +67,7 @@ const agentSlice = createSlice({
     setSessions(state, action: PayloadAction<unknown[]>) {
       state.sessions = action.payload
     },
-    loadSession(state, action: PayloadAction<{ threadId: string; messages: Message[] }>) {
+    loadSession(state, action: PayloadAction<{ threadId: string; messages: StreamMessage[] }>) {
       state.threadId = action.payload.threadId
       state.messages = action.payload.messages
       state.isStreaming = false
@@ -93,6 +80,7 @@ const agentSlice = createSlice({
 export const {
   setThreadId,
   addMessage,
+  setMessages,
   updateLastMessage,
   setStreaming,
   setCurrentStep,

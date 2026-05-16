@@ -15,17 +15,21 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { ArgumentBubble } from "./ArgumentBubble";
 import { cn } from "@/lib/utils";
+import { useAppDispatch, useDebateState } from "@/store/hooks";
+import {
+  setTopic,
+  addArgument,
+  setPhase,
+  setConclusion,
+  setStreaming,
+  setCurrentRound,
+  setMaxRounds,
+  setSuggestions,
+  resetDebate,
+} from "@/store/slices/debateSlice";
+import { getAuthHeaders } from "@/lib/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type Phase = "setup" | "debating" | "concluded";
-
-interface DebateEntry {
-  agent:    "optimist" | "skeptic";
-  argument: string;
-  round:    number;
-  persona:  string;
-}
-
 interface Conclusion {
   consensus_reached:  boolean;
   consensus_summary:  string | null;
@@ -41,31 +45,61 @@ const BASE_URL =
 
 // ── Component ──────────────────────────────────────────────────────────────
 export function DebateArena() {
-  const router = useRouter();
+  const router   = useRouter();
+  const dispatch = useAppDispatch();
 
-  // ── State ─────────────────────────────────────────────────────────────
-  const [phase,           setPhase]          = useState<Phase>("setup");
-  const [topic,           setTopic]          = useState("");
-  const [articleContext,  setArticleContext]  = useState("");
-  const [maxRounds,       setMaxRounds]      = useState(4);
-  const [debateHistory,   setDebateHistory]  = useState<DebateEntry[]>([]);
-  const [conclusion,      setConclusion]     = useState<Conclusion | null>(null);
-  const [isStreaming,     setIsStreaming]     = useState(false);
-  const [currentSpeaker,  setCurrentSpeaker] = useState<"optimist" | "skeptic" | null>(null);
-  const [suggestions,     setSuggestions]    = useState<string[]>([]);
-  const [error,           setError]          = useState<string | null>(null);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(true);
+  // ── Redux state (persisted) ───────────────────────────────────────────
+  const {
+    topic:        reduxTopic,
+    debateHistory,
+    phase,
+    conclusion,
+    isStreaming,
+    maxRounds,
+    currentRound,
+    suggestions,
+  } = useDebateState();
 
-  const bottomRef  = useRef<HTMLDivElement | null>(null);
-  const abortRef   = useRef<AbortController | null>(null);
+  // ── Local state (transient UI, not persisted) ─────────────────────────
+  const [topicInput,         setTopicInput]         = useState(reduxTopic || "");
+  const [articleContext,     setArticleContext]     = useState("");
+  const [currentSpeaker,    setCurrentSpeaker]    = useState<"optimist" | "skeptic" | null>(null);
+  const [error,              setError]             = useState<string | null>(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(suggestions.length === 0);
 
-  // ── Fetch suggestions on mount ────────────────────────────────────────
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const abortRef  = useRef<AbortController | null>(null);
+
+  // ── On mount: restore scroll if debate is in progress ────────────────
   useEffect(() => {
+    if (phase !== "setup") {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Derive current speaker from last history entry
+      const last = debateHistory[debateHistory.length - 1];
+      if (last && phase === "debating") {
+        setCurrentSpeaker(last.agent === "optimist" ? "skeptic" : "optimist");
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Fetch suggestions (skip if already in Redux) ──────────────────────
+  useEffect(() => {
+    if (suggestions.length > 0) {
+      setLoadingSuggestions(false);
+      return;
+    }
     fetch(`${BASE_URL}/api/debate/topics/suggestions`)
       .then(r => r.json())
-      .then(d => setSuggestions(d.suggestions ?? []))
-      .catch(() => setSuggestions([]))
-      .finally(() => setLoadingSuggestions(false));
+      .then(d => {
+        dispatch(setSuggestions(d.suggestions ?? []));
+        setLoadingSuggestions(false);
+      })
+      .catch(() => {
+        dispatch(setSuggestions([]));
+        setLoadingSuggestions(false);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Auto-scroll ───────────────────────────────────────────────────────
@@ -75,24 +109,29 @@ export function DebateArena() {
 
   // ── Start debate ──────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
-    if (!topic.trim()) return;
+    if (!topicInput.trim()) return;
 
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
 
-    setPhase("debating");
-    setIsStreaming(true);
-    setDebateHistory([]);
-    setConclusion(null);
+    const trimmedTopic = topicInput.trim();
+
+    // Reset history/conclusion/phase, then configure the new debate
+    dispatch(resetDebate());
+    dispatch(setTopic(trimmedTopic));
+    dispatch(setPhase("debating"));
+    dispatch(setStreaming(true));
+    dispatch(setSuggestions(suggestions));
+
     setError(null);
     setCurrentSpeaker("optimist");
 
     try {
       const response = await fetch(`${BASE_URL}/api/debate/start`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          topic:           topic.trim(),
+          topic:           trimmedTopic,
           article_context: articleContext,
           max_rounds:      maxRounds,
         }),
@@ -105,6 +144,7 @@ export function DebateArena() {
       const reader  = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer    = "";
+      let roundCount = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -124,83 +164,85 @@ export function DebateArena() {
           const { event, data } = parsed;
 
           if (event === "argument") {
-            const entry: DebateEntry = {
-              agent:    data.agent as "optimist" | "skeptic",
-              argument: data.argument as string,
-              round:    data.round as number,
-              persona:  data.persona as string,
-            };
-            setDebateHistory(prev => [...prev, entry]);
-            // After optimist speaks → skeptic is next, vice versa
-            setCurrentSpeaker(entry.agent === "optimist" ? "skeptic" : "optimist");
+            const agent = data.agent as "optimist" | "skeptic";
+            roundCount = data.round as number;
+            dispatch(addArgument({
+              id:        `${agent}-${roundCount}-${Date.now()}`,
+              agent,
+              argument:  data.argument as string,
+              round:     roundCount,
+              timestamp: new Date().toISOString(),
+            }));
+            dispatch(setCurrentRound(Math.ceil((roundCount + 1) / 2)));
+            setCurrentSpeaker(agent === "optimist" ? "skeptic" : "optimist");
           }
 
           if (event === "conclusion") {
-            setConclusion({
+            dispatch(setConclusion({
               consensus_reached: data.consensus_reached as boolean,
               consensus_summary: data.consensus_summary as string | null,
               winner:            data.winner as "optimist" | "skeptic" | "draw",
               key_insight:       data.key_insight as string,
               total_rounds:      data.total_rounds as number,
-            });
-            setPhase("concluded");
+            }));
+            dispatch(setPhase("concluded"));
           }
 
           if (event === "done") {
-            setIsStreaming(false);
+            dispatch(setStreaming(false));
             setCurrentSpeaker(null);
           }
 
           if (event === "error") {
-            setError(data.message as string ?? "Debate failed");
-            setIsStreaming(false);
-            setPhase("setup");
+            setError((data.message as string) ?? "Debate failed");
+            dispatch(setStreaming(false));
+            dispatch(setPhase("setup"));
           }
         }
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== "AbortError") {
         setError(err.message);
-        setPhase("setup");
+        dispatch(setPhase("setup"));
       }
     } finally {
-      setIsStreaming(false);
+      dispatch(setStreaming(false));
     }
-  }, [topic, articleContext, maxRounds]);
+  }, [topicInput, articleContext, maxRounds, suggestions, dispatch]);
 
   // ── Reset ─────────────────────────────────────────────────────────────
   const handleReset = useCallback(() => {
     if (abortRef.current) abortRef.current.abort();
-    setPhase("setup");
-    setDebateHistory([]);
-    setConclusion(null);
-    setError(null);
+    dispatch(resetDebate());
     setCurrentSpeaker(null);
-    setIsStreaming(false);
-  }, []);
+    setError(null);
+    setTopicInput("");
+  }, [dispatch]);
 
   // ── Share ─────────────────────────────────────────────────────────────
   const handleShare = useCallback(() => {
     const lines = [
-      `🥊 AI Debate Arena — "${topic}"`,
+      `🥊 AI Debate Arena — "${reduxTopic}"`,
       `${"─".repeat(40)}`,
       ...debateHistory.map(e =>
         `[${e.agent.toUpperCase()} R${e.round + 1}]: ${e.argument}`
       ),
     ];
-    if (conclusion) {
+    const conc = conclusion as Conclusion | null;
+    if (conc) {
       lines.push(`${"─".repeat(40)}`);
-      lines.push(`🏆 Winner: ${conclusion.winner.toUpperCase()}`);
-      if (conclusion.key_insight) lines.push(`💡 Key insight: ${conclusion.key_insight}`);
+      lines.push(`🏆 Winner: ${conc.winner.toUpperCase()}`);
+      if (conc.key_insight) lines.push(`💡 Key insight: ${conc.key_insight}`);
     }
     navigator.clipboard.writeText(lines.join("\n\n"));
-  }, [topic, debateHistory, conclusion]);
+  }, [reduxTopic, debateHistory, conclusion]);
 
   // Optimist and skeptic columns from history
   const optimistArgs = debateHistory.filter(e => e.agent === "optimist");
   const skepticArgs  = debateHistory.filter(e => e.agent === "skeptic");
-  const totalRounds  = conclusion?.total_rounds ?? maxRounds;
-  const currentRound = Math.ceil(debateHistory.length / 2);
+  const conc         = conclusion as Conclusion | null;
+  const totalRounds  = conc?.total_rounds ?? maxRounds;
+  const displayRound = currentRound || Math.ceil(debateHistory.length / 2);
 
   // =========================================================================
   // RENDER
@@ -248,8 +290,8 @@ export function DebateArena() {
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Debate topic</label>
                 <textarea
-                  value={topic}
-                  onChange={e => setTopic(e.target.value)}
+                  value={topicInput}
+                  onChange={e => setTopicInput(e.target.value)}
                   placeholder="Enter a news headline or topic to debate…"
                   rows={3}
                   className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-400 transition-all"
@@ -269,7 +311,7 @@ export function DebateArena() {
                     : suggestions.map((s, i) => (
                         <button
                           key={i}
-                          onClick={() => setTopic(s)}
+                          onClick={() => setTopicInput(s)}
                           className="text-xs px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-violet-400 hover:text-violet-700 hover:bg-violet-50 transition-all"
                         >
                           {s.length > 60 ? s.slice(0, 58) + "…" : s}
@@ -286,7 +328,7 @@ export function DebateArena() {
                   {[2, 3, 4, 5, 6].map(n => (
                     <button
                       key={n}
-                      onClick={() => setMaxRounds(n)}
+                      onClick={() => dispatch(setMaxRounds(n))}
                       className={cn(
                         "size-10 rounded-xl text-sm font-bold transition-all border",
                         maxRounds === n
@@ -311,7 +353,7 @@ export function DebateArena() {
               {/* CTA */}
               <button
                 onClick={handleStart}
-                disabled={!topic.trim()}
+                disabled={!topicInput.trim()}
                 className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-sm font-bold rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-violet-600/25"
               >
                 <Swords className="size-4" />
@@ -333,15 +375,15 @@ export function DebateArena() {
             {/* Progress bar + round counter */}
             <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-3 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-500">
-                <span className="font-semibold text-slate-700 truncate max-w-sm">"{topic}"</span>
+                <span className="font-semibold text-slate-700 truncate max-w-sm">"{reduxTopic}"</span>
                 <span className="font-medium flex-shrink-0 ml-2">
-                  Round {Math.min(currentRound, totalRounds)} of {totalRounds}
+                  Round {Math.min(displayRound, totalRounds)} of {totalRounds}
                 </span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-violet-500 rounded-full"
-                  animate={{ width: `${(Math.min(currentRound, totalRounds) / totalRounds) * 100}%` }}
+                  animate={{ width: `${(Math.min(displayRound, totalRounds) / totalRounds) * 100}%` }}
                   transition={{ duration: 0.4 }}
                 />
               </div>
@@ -429,7 +471,7 @@ export function DebateArena() {
 
                 {/* ── VERDICT SECTION ──────────────────────────────────── */}
                 <AnimatePresence>
-                  {phase === "concluded" && conclusion && (
+                  {phase === "concluded" && conc && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -446,54 +488,54 @@ export function DebateArena() {
                       {/* Winner card */}
                       <div className={cn(
                         "rounded-2xl p-5 border-2 space-y-4",
-                        conclusion.winner === "optimist"
+                        conc.winner === "optimist"
                           ? "bg-emerald-50 border-emerald-300"
-                          : conclusion.winner === "skeptic"
+                          : conc.winner === "skeptic"
                           ? "bg-red-50 border-red-300"
                           : "bg-slate-50 border-slate-300"
                       )}>
                         {/* Winner badge */}
                         <div className="flex items-center gap-3">
-                          {conclusion.winner === "draw"
+                          {conc.winner === "draw"
                             ? <Minus className="size-5 text-slate-500" />
-                            : conclusion.winner === "optimist"
+                            : conc.winner === "optimist"
                             ? <Trophy className="size-5 text-emerald-600" />
                             : <Trophy className="size-5 text-red-500" />
                           }
                           <span className={cn(
                             "text-lg font-bold",
-                            conclusion.winner === "optimist" ? "text-emerald-700"
-                            : conclusion.winner === "skeptic" ? "text-red-600"
+                            conc.winner === "optimist" ? "text-emerald-700"
+                            : conc.winner === "skeptic" ? "text-red-600"
                             : "text-slate-600"
                           )}>
-                            {conclusion.winner === "draw"
+                            {conc.winner === "draw"
                               ? "Draw — Both sides argued effectively"
-                              : conclusion.winner === "optimist"
+                              : conc.winner === "optimist"
                               ? "Optimist Wins"
                               : "Skeptic Wins"
                             }
                           </span>
                           <span className="ml-auto text-xs text-slate-400 font-medium">
-                            {conclusion.total_rounds} rounds debated
+                            {conc.total_rounds} rounds debated
                           </span>
                         </div>
 
                         {/* Consensus box */}
-                        {conclusion.consensus_reached && conclusion.consensus_summary && (
+                        {conc.consensus_reached && conc.consensus_summary && (
                           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2">
                             <CheckCircle2 className="size-4 text-blue-500 flex-shrink-0 mt-0.5" />
                             <div>
                               <p className="text-xs font-bold text-blue-700 mb-0.5">Consensus reached</p>
-                              <p className="text-sm text-blue-800 leading-relaxed">{conclusion.consensus_summary}</p>
+                              <p className="text-sm text-blue-800 leading-relaxed">{conc.consensus_summary}</p>
                             </div>
                           </div>
                         )}
 
                         {/* Key insight */}
-                        {conclusion.key_insight && (
+                        {conc.key_insight && (
                           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                             <p className="text-xs font-bold text-amber-700 mb-0.5">💡 Key Insight</p>
-                            <p className="text-sm text-amber-800 leading-relaxed">{conclusion.key_insight}</p>
+                            <p className="text-sm text-amber-800 leading-relaxed">{conc.key_insight}</p>
                           </div>
                         )}
                       </div>

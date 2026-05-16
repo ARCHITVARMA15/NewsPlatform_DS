@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/auth/UserAvatar";
 
 // ── Nav config ────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -184,6 +185,11 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           <Settings className="size-4 flex-shrink-0 text-slate-400" />
           {!collapsed && <span className="flex-1 truncate">Settings</span>}
         </Link>
+      </div>
+
+      {/* ── User avatar ─────────────────────────────────────────────── */}
+      <div className="mt-auto pt-4 border-t border-gray-800 px-2 pb-3">
+        <UserAvatar />
       </div>
     </aside>
   );

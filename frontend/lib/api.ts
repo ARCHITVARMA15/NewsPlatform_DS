@@ -16,6 +16,20 @@ import type {
   SentimentTrend,
   TrendingKeyword,
 } from "./types";
+import { store } from "@/store";
+
+export function getAuthHeaders(): HeadersInit {
+  if (typeof window === "undefined") return { "Content-Type": "application/json" };
+  const token = store.getState().auth.accessToken;
+  return token
+    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+    : { "Content-Type": "application/json" };
+}
+
+function _getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return store.getState().auth.accessToken;
+}
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -41,7 +55,7 @@ async function _get<T>(
 async function _post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`POST ${path} failed: HTTP ${res.status}`);
@@ -106,8 +120,11 @@ class APIClient {
     const url = new URL(`${BASE_URL}/api/rag/upload-pdf`);
     if (threadId) url.searchParams.set("thread_id", threadId);
 
+    const token = _getAuthToken();
+    const authHeader: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(url.toString(), {
       method: "POST",
+      headers: authHeader,
       body: formData,
     });
     if (!res.ok) {
@@ -120,7 +137,7 @@ class APIClient {
   async uploadFromDrive(driveUrl: string, threadId?: string): Promise<PDFMetadata> {
     const res = await fetch(`${BASE_URL}/api/rag/upload-drive`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ drive_url: driveUrl, thread_id: threadId || null }),
     });
     if (!res.ok) {
@@ -199,7 +216,7 @@ class APIClient {
     // Here we just fire without reading, for non-streaming callers.
     await fetch(`${BASE_URL}/api/${agentType}/action`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(action),
     });
   }
@@ -208,7 +225,7 @@ class APIClient {
   async generateBriefing(topN: number): Promise<BriefingResponse> {
     const res = await fetch(`${BASE_URL}/api/briefing/generate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ top_n: topN, anchor_image_url: null }),
       signal: AbortSignal.timeout(90_000), // 90s — D-ID can be slow
     });

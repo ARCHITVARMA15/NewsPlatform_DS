@@ -52,6 +52,9 @@ const debateSlice = createSlice({
     setCurrentRound(state, action: PayloadAction<number>) {
       state.currentRound = action.payload
     },
+    setMaxRounds(state, action: PayloadAction<number>) {
+      state.maxRounds = action.payload
+    },
     setSuggestions(state, action: PayloadAction<string[]>) {
       state.suggestions = action.payload
     },
@@ -73,6 +76,7 @@ export const {
   setConclusion,
   setStreaming,
   setCurrentRound,
+  setMaxRounds,
   setSuggestions,
   resetDebate,
 } = debateSlice.actions
